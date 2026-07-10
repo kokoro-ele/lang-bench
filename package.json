@@ -1,0 +1,14 @@
+{
+  "name": "lang-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixtures": "node runner/gen-fixtures.mjs",
+    "bench": "node runner/run.mjs",
+    "bench:quick": "node runner/run.mjs --quick",
+    "serve": "node web/serve.mjs"
+  },
+  "dependencies": {
+    "autocannon": "^8.0.0"
+  }
+}

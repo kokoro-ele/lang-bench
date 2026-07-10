@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lang-bench</title>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --c-node: #008300;
+    --c-go: #2a78d6;
+    --c-rust: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --c-node: #008300;
+      --c-go: #3987e5;
+      --c-rust: #d95926;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  .head { display: flex; align-items: baseline; gap: 12px; }
+  h1 { font-size: 20px; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 450; }
+  #lang-toggle {
+    margin-left: auto; font: inherit; font-size: 12.5px; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+    padding: 3px 12px; cursor: pointer;
+  }
+  #lang-toggle:hover { border-color: var(--baseline); color: var(--ink); }
+  .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2px 9px; font-size: 12px; color: var(--ink-2);
+  }
+  .legend { display: flex; gap: 16px; margin: 22px 0 4px; font-size: 13px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+  section { margin-top: 26px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+  .sec-head h2 { font-size: 15px; font-weight: 650; }
+  .sec-head small { color: var(--muted); }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button {
+    font: inherit; font-size: 12.5px; color: var(--ink-2); background: transparent;
+    border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px; cursor: pointer;
+  }
+  .tabs button.on { background: var(--surface); color: var(--ink); border-color: var(--baseline); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 14px;
+  }
+  .card h3 { font-size: 13.5px; font-weight: 650; }
+  .card .sub { font-size: 12px; color: var(--muted); margin: 1px 0 12px; }
+  .row { display: grid; grid-template-columns: 46px 1fr 84px; align-items: center; gap: 10px; margin: 7px 0; }
+  .card.srv .row { grid-template-columns: 46px 1fr 118px; }
+  .row .lang { font-size: 12.5px; color: var(--ink-2); }
+  .track { position: relative; height: 18px; border-left: 2px solid var(--baseline); }
+  .bar {
+    position: absolute; inset: 1px auto 1px 0; min-width: 3px;
+    border-radius: 0 4px 4px 0; cursor: default;
+  }
+  .row .val { font-size: 12.5px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .row.best .val { color: var(--ink); font-weight: 650; }
+  .row .val small { color: var(--muted); font-weight: 400; }
+  .none { color: var(--muted); font-size: 12.5px; }
+  .extras { border-top: 1px solid var(--grid); margin-top: 12px; padding-top: 8px; font-size: 12px; color: var(--ink-2); }
+  .extras div { display: flex; justify-content: space-between; padding: 1.5px 0; }
+  .extras b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  #tip {
+    position: fixed; z-index: 10; pointer-events: none; display: none;
+    background: var(--surface); border: 1px solid var(--baseline); border-radius: 8px;
+    padding: 8px 11px; font-size: 12px; color: var(--ink-2);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12); max-width: 260px;
+  }
+  #tip b { color: var(--ink); }
+  #empty {
+    background: var(--surface); border: 1px dashed var(--baseline); border-radius: 12px;
+    padding: 48px 24px; text-align: center; color: var(--ink-2); margin-top: 28px;
+  }
+  #empty code { background: var(--page); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+  details { margin-top: 30px; }
+  summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  table { border-collapse: collapse; margin-top: 12px; width: 100%; font-size: 12.5px; }
+  th, td { text-align: right; padding: 5px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--muted); font-weight: 600; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>lang-bench <span id="subtitle"></span></h1>
+    <button id="lang-toggle"></button>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div class="legend" id="legend"></div>
+
+  <div id="empty"></div>
+
+  <div id="content" class="hidden">
+    <section>
+      <div class="sec-head">
+        <h2 id="cli-title"></h2>
+        <div class="tabs" id="tabs"></div>
+        <small id="metric-hint"></small>
+      </div>
+      <div class="grid" id="cli-grid"></div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2 id="srv-title"></h2><small id="srv-hint"></small></div>
+      <div class="grid" id="srv-grid"></div>
+    </section>
+
+    <details id="table-wrap">
+      <summary id="table-summary"></summary>
+      <div style="overflow-x:auto"><table id="table"></table></div>
+    </details>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script>
+const LANGS = ['node', 'go', 'rust'];
+const LANG_NAME = { node: 'Node', go: 'Go', rust: 'Rust' };
+const COLOR = { node: 'var(--c-node)', go: 'var(--c-go)', rust: 'var(--c-rust)' };
+const METRIC_KEYS = ['time', 'mem', 'build', 'size'];
+
+// ---------- 界面文案(中/英) ----------
+const I18N = {
+  zh: {
+    subtitle: '· Node.js / Go / Rust 性能对比',
+    toggle: 'EN',
+    locale: 'zh-CN',
+    cliSection: 'CLI 用例',
+    srvSection: '服务用例',
+    srvHint: '本机回环压测,数值越高越好',
+    metrics: {
+      time: ['运行时间', '中位数,越短越好'],
+      mem: ['内存峰值', '峰值 RSS,越小越好'],
+      build: ['构建时间', '本次构建耗时(Rust 首次含依赖编译),越短越好'],
+      size: ['产物体积', 'Go/Rust 为二进制,Node 为源码文件'],
+    },
+    bench: {
+      fib: '递归 Fibonacci · CPU 密集',
+      'json-parse': 'JSON 解析 + 序列化',
+      'vector-topk': '向量 top-k 检索 · RAG',
+      'text-chunk': '文档切块 + 哈希 · RAG',
+      'http-server': 'HTTP 工具调用网关 · agent tool call',
+      'sse-stream': 'SSE 流式响应 · LLM token 流',
+    },
+    httpSub: '吞吐(req/s)',
+    sseSub: '事件吞吐(events/s)',
+    latencyRow: '延迟 p50 / p99',
+    ttfbRow: 'TTFB p50 / p99',
+    failed: '失败',
+    runFailed: '运行失败',
+    noData: '无数据',
+    noCli: '没有 CLI 用例数据',
+    noSrv: '没有服务用例数据',
+    runsLine: (r, w) => `${r} 次运行,预热 ${w} 次`,
+    nodeSizeNote: 'Node 无二进制,此为源码大小(不含运行时约 80MB)',
+    nodeBuildNote: 'Node 无编译步骤',
+    memPeak: '内存峰值',
+    streamDur: '单流耗时 p50',
+    timerChip: '计时',
+    modeChip: '模式',
+    tableSummary: '完整数据表格',
+    tableHead: ['用例', '语言', '运行中位数', '内存峰值', '构建时间', '产物体积', 'req/s 或 ev/s', 'p50', 'p99'],
+    empty: '还没有测试数据。先运行 <code>npm run bench</code>(或 <code>npm run bench:quick</code>),页面会读取 <code>results/latest.json</code>;也可以把任意 <code>results/*.json</code> 拖到本页面。',
+    invalidJson: '不是有效的 results JSON',
+  },
+  en: {
+    subtitle: '· Node.js / Go / Rust performance comparison',
+    toggle: '中文',
+    locale: 'en-US',
+    cliSection: 'CLI benchmarks',
+    srvSection: 'Server benchmarks',
+    srvHint: 'Loopback load test on this machine, higher is better',
+    metrics: {
+      time: ['Run time', 'Median, lower is better'],
+      mem: ['Peak memory', 'Peak RSS, lower is better'],
+      build: ['Build time', 'This build\'s wall time (first Rust build includes deps), lower is better'],
+      size: ['Artifact size', 'Go/Rust: stripped binary; Node: source file'],
+    },
+    bench: {
+      fib: 'Recursive Fibonacci · CPU-bound',
+      'json-parse': 'JSON parse + serialize',
+      'vector-topk': 'Vector top-k search · RAG',
+      'text-chunk': 'Document chunking + hash · RAG',
+      'http-server': 'HTTP tool-call gateway · agent tool call',
+      'sse-stream': 'SSE streaming · LLM token relay',
+    },
+    httpSub: 'throughput (req/s)',
+    sseSub: 'event throughput (events/s)',
+    latencyRow: 'latency p50 / p99',
+    ttfbRow: 'TTFB p50 / p99',
+    failed: 'failed',
+    runFailed: 'Run failed',
+    noData: 'no data',
+    noCli: 'No CLI benchmark data',
+    noSrv: 'No server benchmark data',
+    runsLine: (r, w) => `${r} runs, ${w} warmup`,
+    nodeSizeNote: 'Node has no binary; this is source size (runtime itself is ~80MB)',
+    nodeBuildNote: 'Node has no compile step',
+    memPeak: 'peak RSS',
+    streamDur: 'stream duration p50',
+    timerChip: 'timer',
+    modeChip: 'mode',
+    tableSummary: 'Full data table',
+    tableHead: ['Benchmark', 'Language', 'Run median', 'Peak RSS', 'Build time', 'Artifact', 'req/s or ev/s', 'p50', 'p99'],
+    empty: 'No results yet. Run <code>npm run bench</code> (or <code>npm run bench:quick</code>) and this page will read <code>results/latest.json</code> — or drag any <code>results/*.json</code> onto this page.',
+    invalidJson: 'Not a valid results JSON',
+  },
+};
+
+let ui = localStorage.getItem('lang-bench-ui')
+  ?? (navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en');
+let metric = 'time';
+let data = null;
+
+const $ = s => document.querySelector(s);
+const T = () => I18N[ui];
+
+const fmtTime = s => s == null ? '—' : s >= 1 ? s.toFixed(2) + ' s' : (s * 1000).toFixed(s < 0.01 ? 1 : 0) + ' ms';
+const fmtBytes = b => {
+  if (b == null) return '—';
+  if (b >= 1 << 20) return (b / (1 << 20)).toFixed(1) + ' MB';
+  if (b >= 1024) return (b / 1024).toFixed(0) + ' KB';
+  return b + ' B';
+};
+const fmtNum = n => n == null ? '—' : Math.round(n).toLocaleString('en-US');
+const fmtMs = m => m == null ? '—' : m >= 100 ? Math.round(m) + ' ms' : m.toFixed(1) + ' ms';
+const fmt = (v, unit) => unit === 's' ? fmtTime(v) : fmtBytes(v);
+
+function metricValue(rec, m) {
+  if (!rec || rec.error) return null;
+  if (m === 'time') return rec.cli?.seconds.median;
+  if (m === 'mem') return rec.cli ? rec.cli.peakRssBytes : (rec.http ?? rec.sse)?.peakRssBytes;
+  if (m === 'build') return rec.build?.seconds;
+  if (m === 'size') return rec.build?.artifactBytes;
+  return null;
+}
+
+function tipHtml(rec, m) {
+  if (!rec) return '';
+  if (rec.error) return `<b>${T().runFailed}</b><br>${rec.error}`;
+  const rows = [];
+  if (rec.cli && m === 'time') {
+    const s = rec.cli.seconds;
+    rows.push(`mean ${fmtTime(s.mean)} ± ${fmtTime(s.stddev)}`,
+              `min ${fmtTime(s.min)} · max ${fmtTime(s.max)}`,
+              T().runsLine(rec.cli.runs, rec.cli.warmup));
+  }
+  if (m === 'size' && rec.lang === 'node') rows.push(T().nodeSizeNote);
+  if (m === 'build' && rec.lang === 'node') rows.push(T().nodeBuildNote);
+  return `<b>${LANG_NAME[rec.lang]}</b><br>` + rows.join('<br>');
+}
+
+// 一组横向条形:rows = [{lang, value, display, tip}],lowerBetter 决定“最佳”加粗
+function barsHtml(rows, lowerBetter) {
+  const vals = rows.map(r => r.value).filter(v => v != null && isFinite(v));
+  if (!vals.length) return `<div class="none">${T().noData}</div>`;
+  const max = Math.max(...vals);
+  const best = lowerBetter ? Math.min(...vals) : max;
+  return rows.map(r => {
+    if (r.value == null) {
+      return `<div class="row"><span class="lang">${LANG_NAME[r.lang]}</span>
+        <div class="track"></div><span class="val"><small>${r.display ?? '—'}</small></span></div>`;
+    }
+    const pct = max ? Math.max(1.5, (r.value / max) * 100) : 0;
+    return `<div class="row${r.value === best ? ' best' : ''}" data-tip="${encodeURIComponent(r.tip ?? '')}">
+      <span class="lang">${LANG_NAME[r.lang]}</span>
+      <div class="track"><div class="bar" style="width:${pct}%;background:${COLOR[r.lang]}"></div></div>
+      <span class="val">${r.display}</span></div>`;
+  }).join('');
+}
+
+// 与数据无关的静态文案
+function renderStatic() {
+  const t = T();
+  document.documentElement.lang = ui === 'zh' ? 'zh-CN' : 'en';
+  document.title = `lang-bench — Node.js / Go / Rust`;
+  $('#subtitle').textContent = t.subtitle;
+  $('#lang-toggle').textContent = t.toggle;
+  $('#empty').innerHTML = t.empty;
+  $('#cli-title').textContent = t.cliSection;
+  $('#srv-title').textContent = t.srvSection;
+  $('#srv-hint').textContent = t.srvHint;
+  $('#table-summary').textContent = t.tableSummary;
+  $('#legend').innerHTML = LANGS.map(l =>
+    `<span><i style="background:${COLOR[l]}"></i>${LANG_NAME[l]}</span>`).join('');
+}
+
+function render() {
+  renderStatic();
+  if (!data) return;
+  const t = T();
+  const byBench = {};
+  for (const r of data.results) (byBench[r.bench] ??= {})[r.lang] = r;
+
+  // meta 信息条
+  const m = data.meta;
+  $('#meta').innerHTML = [
+    m.cpu, `${m.cores} cores · ${m.memGB}GB`, m.platform,
+    m.versions.node && `node ${m.versions.node}`,
+    m.versions.go, m.versions.rustc,
+    `${t.timerChip}: ${m.timer}`, `${t.modeChip}: ${m.mode}`,
+    new Date(m.timestamp).toLocaleString(t.locale),
+  ].filter(Boolean).map(x => `<span class="chip">${x}</span>`).join('');
+
+  // CLI 卡片(随指标切换)
+  const [, hint] = t.metrics[metric];
+  $('#metric-hint').textContent = hint;
+  $('#tabs').innerHTML = METRIC_KEYS.map(k =>
+    `<button class="${k === metric ? 'on' : ''}" data-m="${k}">${t.metrics[k][0]}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b =>
+    b.addEventListener('click', () => { metric = b.dataset.m; render(); }));
+
+  const unit = metric === 'time' || metric === 'build' ? 's' : 'bytes';
+  const cliBenches = Object.keys(t.bench).filter(b =>
+    byBench[b] && Object.values(byBench[b]).some(r => r.type === 'cli'));
+  $('#cli-grid').innerHTML = cliBenches.map(bench => {
+    const rows = LANGS.map(lang => {
+      const rec = byBench[bench]?.[lang];
+      const v = metricValue(rec, metric);
+      return {
+        lang, value: v,
+        display: rec?.error ? t.failed : fmt(v, unit),
+        tip: tipHtml(rec, metric),
+      };
+    });
+    return `<div class="card"><h3>${bench}</h3><div class="sub">${t.bench[bench]}</div>
+      ${barsHtml(rows, true)}</div>`;
+  }).join('') || `<div class="none">${t.noCli}</div>`;
+
+  // 服务卡片
+  const srv = [];
+  if (byBench['http-server']) {
+    const rows = LANGS.map(lang => {
+      const rec = byBench['http-server'][lang];
+      return {
+        lang, value: rec?.http?.requestsPerSec ?? null,
+        display: rec?.error ? t.failed : rec?.http ? fmtNum(rec.http.requestsPerSec) + ' req/s' : '—',
+        tip: rec?.error ? tipHtml(rec) : rec?.http ? `<b>${LANG_NAME[lang]}</b><br>p50 ${fmtMs(rec.http.latencyMs.p50)} · p99 ${fmtMs(rec.http.latencyMs.p99)}<br>${t.memPeak} ${fmtBytes(rec.http.peakRssBytes)}` : '',
+      };
+    });
+    const extras = LANGS.filter(l => byBench['http-server'][l]?.http).map(l => {
+      const h = byBench['http-server'][l].http;
+      return `<div><span>${LANG_NAME[l]} ${t.latencyRow}</span><b>${fmtMs(h.latencyMs.p50)} / ${fmtMs(h.latencyMs.p99)}</b></div>`;
+    }).join('');
+    srv.push(`<div class="card srv"><h3>http-server</h3>
+      <div class="sub">${t.bench['http-server']} · ${t.httpSub}</div>
+      ${barsHtml(rows, false)}<div class="extras">${extras}</div></div>`);
+  }
+  if (byBench['sse-stream']) {
+    const rows = LANGS.map(lang => {
+      const rec = byBench['sse-stream'][lang];
+      return {
+        lang, value: rec?.sse?.eventsPerSec ?? null,
+        display: rec?.error ? t.failed : rec?.sse ? fmtNum(rec.sse.eventsPerSec) + ' ev/s' : '—',
+        tip: rec?.error ? tipHtml(rec) : rec?.sse ? `<b>${LANG_NAME[lang]}</b><br>TTFB p50 ${fmtMs(rec.sse.ttfbMs.p50)} · p99 ${fmtMs(rec.sse.ttfbMs.p99)}<br>${t.streamDur} ${fmtMs(rec.sse.streamDurationMs.p50)}<br>${t.memPeak} ${fmtBytes(rec.sse.peakRssBytes)}` : '',
+      };
+    });
+    const extras = LANGS.filter(l => byBench['sse-stream'][l]?.sse).map(l => {
+      const s = byBench['sse-stream'][l].sse;
+      return `<div><span>${LANG_NAME[l]} ${t.ttfbRow}</span><b>${fmtMs(s.ttfbMs.p50)} / ${fmtMs(s.ttfbMs.p99)}</b></div>`;
+    }).join('');
+    srv.push(`<div class="card srv"><h3>sse-stream</h3>
+      <div class="sub">${t.bench['sse-stream']} · ${t.sseSub}</div>
+      ${barsHtml(rows, false)}<div class="extras">${extras}</div></div>`);
+  }
+  $('#srv-grid').innerHTML = srv.join('') || `<div class="none">${t.noSrv}</div>`;
+
+  // 完整表格(无障碍/核对用)
+  const body = data.results.map(r => {
+    const perf = r.http ? fmtNum(r.http.requestsPerSec) : r.sse ? fmtNum(r.sse.eventsPerSec) : '';
+    const p50 = r.http ? fmtMs(r.http.latencyMs.p50) : r.sse ? fmtMs(r.sse.ttfbMs.p50) : '';
+    const p99 = r.http ? fmtMs(r.http.latencyMs.p99) : r.sse ? fmtMs(r.sse.ttfbMs.p99) : '';
+    return `<tr><td>${r.bench}</td><td>${LANG_NAME[r.lang] ?? r.lang}</td>
+      <td>${r.error ? t.failed : fmtTime(r.cli?.seconds.median)}</td>
+      <td>${fmtBytes(r.cli?.peakRssBytes ?? r.http?.peakRssBytes ?? r.sse?.peakRssBytes)}</td>
+      <td>${fmtTime(r.build?.seconds)}</td><td>${fmtBytes(r.build?.artifactBytes)}</td>
+      <td>${perf}</td><td>${p50}</td><td>${p99}</td></tr>`;
+  }).join('');
+  $('#table').innerHTML = `<tr>${t.tableHead.map(h => `<th>${h}</th>`).join('')}</tr>${body}`;
+
+  $('#empty').classList.add('hidden');
+  $('#content').classList.remove('hidden');
+  bindTips();
+}
+
+// 悬停提示
+const tip = $('#tip');
+function bindTips() {
+  document.querySelectorAll('.row[data-tip]').forEach(row => {
+    row.addEventListener('mousemove', e => {
+      const html = decodeURIComponent(row.dataset.tip || '');
+      if (!html) return;
+      tip.innerHTML = html;
+      tip.style.display = 'block';
+      const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10);
+      const y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 10);
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    });
+    row.addEventListener('mouseleave', () => (tip.style.display = 'none'));
+  });
+}
+
+$('#lang-toggle').addEventListener('click', () => {
+  ui = ui === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('lang-bench-ui', ui);
+  render();
+});
+
+renderStatic();
+
+// 数据加载:优先 results/latest.json,失败则等待拖拽
+fetch('/results/latest.json')
+  .then(r => (r.ok ? r.json() : Promise.reject()))
+  .then(d => { data = d; render(); })
+  .catch(() => {});
+
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', async e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  try {
+    data = JSON.parse(await file.text());
+    render();
+  } catch {
+    alert(T().invalidJson);
+  }
+});
+</script>
+</body>
+</html>

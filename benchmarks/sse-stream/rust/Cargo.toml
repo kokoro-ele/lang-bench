@@ -1,0 +1,14 @@
+# Rust 标准库没有 HTTP 服务器,axum 是社区事实标准,故此用例引入框架。
+[package]
+name = "sse-stream"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+strip = true
